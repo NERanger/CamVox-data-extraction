@@ -52,6 +52,8 @@ int main(int argc, char const *argv[]){
         }
     }
 
+    // Depth image should be type CV_16U
+    // Depth factor: 504
     BOOST_FOREACH(const rosbag::MessageInstance m, depth_view){
         sensor_msgs::Image::ConstPtr ptr = m.instantiate<sensor_msgs::Image>();
         if(ptr != NULL){
