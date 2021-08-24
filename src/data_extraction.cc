@@ -10,8 +10,12 @@
 
 #include <cv_bridge/cv_bridge.h>
 
+#include <pcl_ros/point_cloud.h>
+
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
+
+#include "livox_ros_driver/CustomMsg.h"
 
 int main(int argc, char const *argv[]){
     
@@ -37,9 +41,11 @@ int main(int argc, char const *argv[]){
 
     rosbag::View rgb_view(bag, rosbag::TopicQuery("/isee_rgb"));
     rosbag::View depth_view(bag, rosbag::TopicQuery("/isee_depth"));
+    rosbag::View ptcloud_view(bag, rosbag::TopicQuery("/livox/lidar"));
 
     boost::format fmt_rgb("%s/color_img/%06d.png");
     boost::format fmt_depth("%s/depth_img/%06d.png");
+    boost::format fmt_ptcloud("%s/ptcloud/%06d.pcd");
 
     BOOST_FOREACH(const rosbag::MessageInstance m, rgb_view){
         sensor_msgs::Image::ConstPtr ptr = m.instantiate<sensor_msgs::Image>();
@@ -62,6 +68,24 @@ int main(int argc, char const *argv[]){
             ROS_INFO("Extracing destination: %s", dst.c_str());
             cv_bridge::CvImageConstPtr cvimg_ptr = cv_bridge::toCvShare(ptr);
             cv::imwrite(dst, cvimg_ptr->image);
+        }
+    }
+
+    BOOST_FOREACH(const rosbag::MessageInstance m, ptcloud_view){
+        livox_ros_driver::CustomMsg::ConstPtr ptr = m.instantiate<livox_ros_driver::CustomMsg>();
+        if(ptr != NULL){
+            std::string dst = (fmt_ptcloud % ex_path % ptr->header.seq).str();
+            ROS_INFO("Extracting ptcloud msg, seq number: %d, point num: %d", ptr->header.seq, ptr->point_num);
+            ROS_INFO("Extracing destination: %s", dst.c_str());
+
+            pcl::PointCloud<pcl::PointXYZ> cloud;
+            for(uint32_t i = 0; i < ptr->point_num; ++i){
+                cloud.push_back(pcl::PointXYZ(ptr->points[i].x, ptr->points[i].y, ptr->points[i].z));
+            }
+            cloud.height = 1;
+            cloud.width = cloud.size();
+
+            pcl::io::savePCDFileBinary(dst, cloud);
         }
     }
     

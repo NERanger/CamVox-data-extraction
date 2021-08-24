@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   rosbag
   sensor_msgs
   cv_bridge
+  pcl_ros
+  livox_ros_driver
 )
 find_package(OpenCV 3.4)
 
