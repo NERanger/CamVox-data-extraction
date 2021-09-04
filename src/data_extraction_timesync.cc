@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <iomanip>
 
 #include <boost/foreach.hpp>
 #include <boost/format.hpp>
@@ -34,7 +35,8 @@ public:
 };
 
 struct PoseData{
-    double seq;
+    double timestamp;  // Sec
+    size_t seq;
     double position_x;
     double position_y;
     double position_z;
@@ -86,7 +88,7 @@ int main(int argc, char const *argv[]){
 
     // Callback and sync
     // TimeSyncType sync(depth_img_sub, rgb_img_sub, nav_sub, imu_sub, 10);
-    message_filters::Synchronizer<SyncPolicy> sync(SyncPolicy(20), depth_img_sub, rgb_img_sub, nav_sub, imu_sub);
+    message_filters::Synchronizer<SyncPolicy> sync(SyncPolicy(100), depth_img_sub, rgb_img_sub, nav_sub, imu_sub);
     sync.registerCallback(boost::bind(&WriteSyncData, _1, _2, _3, _4));
 
     rosbag::Bag bag;
@@ -156,8 +158,18 @@ void WriteSyncData(const sensor_msgs::Image::ConstPtr &depth_ptr,
     std::string depth_dst = (fmt_depth % ex_path % frame_seq).str();
     std::string rgb_dst = (fmt_rgb % ex_path % frame_seq).str();
 
-    cv::imwrite(depth_dst, cv_bridge::toCvShare(depth_ptr)->image);
-    cv::imwrite(rgb_dst, cv_bridge::toCvShare(rgb_ptr)->image);
+    // cv::imwrite(depth_dst, cv_bridge::toCvShare(depth_ptr)->image);
+    // cv::imwrite(rgb_dst, cv_bridge::toCvShare(rgb_ptr)->image);
+
+    // cv::imshow("depth_dst", cv_bridge::toCvShare(depth_ptr)->image);
+    // cv::imshow("rgb_dst", cv_bridge::toCvShare(rgb_ptr)->image);
+
+    // ROS_INFO_STREAM("depth timestamp: " << depth_ptr->header.stamp);
+    // ROS_INFO_STREAM("rgb timestamp: " << rgb_ptr->header.stamp);
+    // ROS_INFO_STREAM("nav timestamp: " << nav_ptr->header.stamp);
+    // ROS_INFO_STREAM("imu timestamp: " << imu_ptr->header.stamp);
+
+    // cv::waitKey(0);
 
     PoseData pose;
     PopulatePoseData(pose, frame_seq, nav_ptr, imu_ptr);
@@ -165,20 +177,21 @@ void WriteSyncData(const sensor_msgs::Image::ConstPtr &depth_ptr,
     
     frame_seq += 1;
 
-    if(frame_seq > 500){
-        stop_flag = true;
-    }
+    // if(frame_seq > 1500){
+    //     stop_flag = true;
+    // }
 }
 
 void CsvWritePose(std::ofstream &ostream, const PoseData &data){
     static bool header_written = false;
 
     if(header_written == false){
-        ostream << "seq, position_x, position_y, position_z, quat_x, quat_y, quat_z, quat_w" << std::endl;
+        ostream << "seq, timestamp, position_x, position_y, position_z, quat_x, quat_y, quat_z, quat_w" << std::endl;
         header_written = true;
     }
 
-    ostream << data.seq << "," << data.position_x << "," << data.position_y << "," << data.position_z 
+    // Be sure to set the output precision
+    ostream << data.seq << std::setprecision(20) << "," << data.timestamp << "," << data.position_x << "," << data.position_y << "," << data.position_z 
                         << "," << data.quat_x << "," << data.quat_y << "," << data.quat_z << "," << data.quat_w << std::endl;
 }
 
@@ -190,6 +203,8 @@ void PopulatePoseData(PoseData &data, uint32_t seq, const sensor_msgs::NavSatFix
     gps_common::LLtoUTM(nav_ptr->latitude, nav_ptr->longitude, northing, easting, zone);
 
     data.seq = seq;
+
+    data.timestamp = nav_ptr->header.stamp.toSec();
 
     data.position_x = easting;
     data.position_y = northing;
