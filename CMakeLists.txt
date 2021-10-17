@@ -141,6 +141,7 @@ include_directories(
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(data_extraction_simple src/data_extraction_simple.cc)
 add_executable(data_extraction_timesync src/data_extraction_timesync.cc)
+add_executable(data_extraction_stream src/data_extraction_stream.cc)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -159,6 +160,11 @@ target_link_libraries(data_extraction_simple
 )
 
 target_link_libraries(data_extraction_timesync
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
+target_link_libraries(data_extraction_stream
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
