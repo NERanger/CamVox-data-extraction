@@ -22,6 +22,8 @@
 
 #include "livox_ros_driver/CustomMsg.h"
 
+#include "point_type/LivoxPoint.hpp"
+
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
 #include <message_filters/simple_filter.h>
@@ -145,11 +147,24 @@ int main(int argc, char const *argv[]){
                 ROS_INFO_STREAM("Extracting lidar msg, timestamp: " << timestamp);
                 ROS_INFO_STREAM("Extracing destination: " << dst);
 
-                pcl::PointCloud<pcl::PointXYZ> cloud;
+                // pcl::PointCloud<pcl::PointXYZ> cloud;
+                // for(uint32_t i = 0; i < ptcloud_kptr->point_num; ++i){
+                //     cloud.push_back(pcl::PointXYZ(ptcloud_kptr->points[i].x, 
+                //                                   ptcloud_kptr->points[i].y, 
+                //                                   ptcloud_kptr->points[i].z));
+                // }
+                // cloud.height = 1;
+                // cloud.width = cloud.size();
+                // pcl::io::savePCDFileBinary(dst, cloud);
+                pcl::PointCloud<LivoxPoint> cloud;
                 for(uint32_t i = 0; i < ptcloud_kptr->point_num; ++i){
-                    cloud.push_back(pcl::PointXYZ(ptcloud_kptr->points[i].x, 
-                                                  ptcloud_kptr->points[i].y, 
-                                                  ptcloud_kptr->points[i].z));
+                    uint64_t pt_timestamp = (uint64_t)ptcloud_kptr->points[i].offset_time + ptcloud_kptr->timebase;
+                    cloud.push_back(LivoxPoint{ptcloud_kptr->points[i].x,
+                                               ptcloud_kptr->points[i].y,
+                                               ptcloud_kptr->points[i].z,
+                                               ptcloud_kptr->points[i].reflectivity,
+                                               (uint32_t)(pt_timestamp >> 32),
+                                               (uint32_t)pt_timestamp});
                 }
                 cloud.height = 1;
                 cloud.width = cloud.size();

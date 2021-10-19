@@ -122,6 +122,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
 # include
+  ${CMAKE_CURRENT_SOURCE_DIR}
   ${catkin_INCLUDE_DIRS}
   ${OpenCV_INCLUDE_DIRS}
 )
@@ -142,6 +143,7 @@ include_directories(
 add_executable(data_extraction_simple src/data_extraction_simple.cc)
 add_executable(data_extraction_timesync src/data_extraction_timesync.cc)
 add_executable(data_extraction_stream src/data_extraction_stream.cc)
+add_executable(pt_test src/point_type_test.cc)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -167,6 +169,11 @@ target_link_libraries(data_extraction_timesync
 target_link_libraries(data_extraction_stream
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
+)
+
+target_link_libraries(pt_test
+  ${catkin_LIBRARIES}
+  # ${OpenCV_LIBRARIES}
 )
 
 #############
