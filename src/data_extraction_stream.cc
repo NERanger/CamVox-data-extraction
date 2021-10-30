@@ -251,9 +251,9 @@ int main(int argc, char const *argv[]){
 
 void WriteSeqInfo(std::ofstream &ofstream, uint64_t timestamp, const std::string &data_type, const std::string &location){
     if(seq_first_write){
-        ofstream << "timestamp [ns],data_type,location" 
-                 << ",w_RS_S_x [rad s^-1], w_RS_S_y [rad s^-1], w_RS_S_z [rad s^-1],"
-                 << "a_RS_S_x [m s^-2], a_RS_S_y [m s^-2], a_RS_S_z [m s^-2]" << std::endl;
+        ofstream << "timestamp,data_type,location" 
+                 << ",wx,wy,wz,"
+                 << "ax,ay,az" << std::endl;
         seq_first_write = false;
     }
 
@@ -263,9 +263,9 @@ void WriteSeqInfo(std::ofstream &ofstream, uint64_t timestamp, const std::string
 
 void WriteSeqInfo(std::ofstream &ofstream, sensor_msgs::Imu::ConstPtr imu_kptr){
     if(seq_first_write){
-        ofstream << "timestamp [ns],data_type,location" 
-                 << ",w_RS_S_x [rad s^-1], w_RS_S_y [rad s^-1], w_RS_S_z [rad s^-1],"
-                 << "a_RS_S_x [m s^-2], a_RS_S_y [m s^-2], a_RS_S_z [m s^-2]" << std::endl;
+        ofstream << "timestamp,data_type,location" 
+                 << ",wx,wy,wz,"
+                 << "ax,ay,az" << std::endl;
         seq_first_write = false;
     }
 

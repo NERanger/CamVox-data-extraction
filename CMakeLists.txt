@@ -143,6 +143,7 @@ include_directories(
 add_executable(data_extraction_simple src/data_extraction_simple.cc)
 add_executable(data_extraction_timesync src/data_extraction_timesync.cc)
 add_executable(data_extraction_stream src/data_extraction_stream.cc)
+add_executable(data_extraction_cali src/data_extraction_cali.cc)
 add_executable(pt_test src/point_type_test.cc)
 
 ## Rename C++ executable without prefix
@@ -170,6 +171,12 @@ target_link_libraries(data_extraction_stream
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
 )
+
+target_link_libraries(data_extraction_cali
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
+
 
 target_link_libraries(pt_test
   ${catkin_LIBRARIES}
