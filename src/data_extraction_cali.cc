@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 
 #include <boost/format.hpp>
 
@@ -13,6 +14,13 @@
 
 #include <rosbag/bag.h>
 #include <rosbag/view.h>
+
+#include <pcl_ros/point_cloud.h>
+#include <pcl_ros/io/pcd_io.h>
+
+#include <opencv2/opencv.hpp>
+
+#include <cv_bridge/cv_bridge.h>
 
 #include <livox_ros_driver/CustomMsg.h>
 
@@ -39,11 +47,18 @@ Eigen::Isometry3d Gnss2Isometry(const sensor_msgs::NavSatFix::ConstPtr &nav_kptr
                                 const sensor_msgs::Imu::ConstPtr &imu_kptr);
 livox_ros_driver::CustomMsg::Ptr PtcloudTransform(const livox_ros_driver::CustomMsg::ConstPtr &ptcloud_kptr, const Eigen::Isometry3d &Transform);
 livox_ros_driver::CustomPoint PtTransforms(const livox_ros_driver::CustomPoint &pt, const Eigen::Isometry3d &Transform);
+pcl::PointCloud<pcl::PointXYZI>::Ptr ToPclCloud(const livox_ros_driver::CustomMsg::ConstPtr &ptcloud_kptr);
+void SaveGtPoses();
 
 namespace{
-    double record_duration_s = 10.0;
+    double record_duration_s = 5.0;
 
     Eigen::Isometry3d Tbl;
+
+    std::string bag_path;
+    std::string output_path;
+
+    std::vector<Eigen::Isometry3d, Eigen::aligned_allocator<Eigen::Isometry3d>> gt_poses;
 }
 
 int main(int argc, char const *argv[]){
@@ -59,8 +74,8 @@ int main(int argc, char const *argv[]){
 
     ros::Time::init();
 
-    std::string bag_path(argv[1]);
-    std::string ex_path(argv[2]);
+    bag_path = std::string(argv[1]);
+    output_path = std::string(argv[2]);
 
     // Setup output file stream
     boost::format fmt_outbag("%s/cali.bag");
@@ -127,6 +142,8 @@ int main(int argc, char const *argv[]){
         }
     }
 
+    SaveGtPoses();
+
     return EXIT_SUCCESS;
 }
 
@@ -139,6 +156,11 @@ void SaveSyncData(const livox_ros_driver::CustomMsg::ConstPtr &ptcloud_kptr,
     static bool is_first = true;
     static Isometry3d first_pose;
 
+    static boost::format fmt_lidar("%s/livox/%06d.pcd");
+    static boost::format fmt_img("%s/image/%06d.png");
+
+    static unsigned int data_idx = 0;
+
     if(is_first){
         first_pose = Gnss2Isometry(nav_kptr, imu_kptr);
         is_first = false;
@@ -146,6 +168,64 @@ void SaveSyncData(const livox_ros_driver::CustomMsg::ConstPtr &ptcloud_kptr,
 
     // Transform from lidar to world
     Isometry3d Twl = first_pose.inverse() * Gnss2Isometry(nav_kptr, imu_kptr) * Tbl;
+    gt_poses.push_back(Twl);
+
+    // Save ptcloud
+    std::string lidar_file = (fmt_lidar % output_path % data_idx).str();
+    ROS_INFO_STREAM(lidar_file);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr cloud = ToPclCloud(ptcloud_kptr);
+    pcl::io::savePCDFile(lidar_file, *cloud);
+
+    // Save image
+    std::string img_file = (fmt_img % output_path % data_idx).str();
+    ROS_INFO_STREAM(img_file);
+    cv::Mat rgb_img = cv_bridge::toCvShare(rgb_kptr)->image;
+    cv::Mat gray_img;
+    cv::cvtColor(rgb_img, gray_img, cv::COLOR_RGB2GRAY);
+    cv::imwrite(img_file, gray_img);
+
+    data_idx += 1;
+
+    ROS_INFO_STREAM(Twl.matrix());
+
+}
+
+void SaveGtPoses(){
+    ROS_ASSERT(!gt_poses.empty());
+    
+    static boost::format fmt_gt("%s/groundtruth.txt");
+
+    std::ofstream gt_file((fmt_gt % output_path).str());
+    for(const Eigen::Isometry3d &pose : gt_poses){
+        const Eigen::Matrix4d mat = pose.matrix();
+
+        gt_file << std::setprecision(5);
+
+        gt_file        << mat(0, 0) << " " << mat(0, 1) << " " << mat(0, 2) << " " << mat(0, 3)
+                << " " << mat(1, 0) << " " << mat(1, 1) << " " << mat(1, 2) << " " << mat(1, 3)
+                << " " << mat(2, 0) << " " << mat(2, 1) << " " << mat(2, 2) << " " << mat(2, 3);
+        
+        gt_file << std::endl;
+    }
+    
+    gt_file.close();
+}
+
+pcl::PointCloud<pcl::PointXYZI>::Ptr ToPclCloud(const livox_ros_driver::CustomMsg::ConstPtr &ptcloud_kptr){
+    pcl::PointCloud<pcl::PointXYZI>::Ptr out(new pcl::PointCloud<pcl::PointXYZI>);
+
+    for(size_t i = 0; i < ptcloud_kptr->points.size(); ++i){
+        const livox_ros_driver::CustomPoint &pt = ptcloud_kptr->points.at(i);
+        pcl::PointXYZI pt_xyzi;
+        pt_xyzi.x = pt.x;
+        pt_xyzi.y = pt.y;
+        pt_xyzi.z = pt.z;
+        pt_xyzi.intensity = pt.reflectivity;
+
+        out->push_back(pt_xyzi);
+    }
+
+    return out;
 }
 
 livox_ros_driver::CustomMsg::Ptr PtcloudTransform(const livox_ros_driver::CustomMsg::ConstPtr &ptcloud_kptr, const Eigen::Isometry3d &Transform){
@@ -184,8 +264,8 @@ Eigen::Isometry3d Gnss2Isometry(const sensor_msgs::NavSatFix::ConstPtr &nav_kptr
     Vector3d trans(easting, northing, nav_kptr->altitude);
     Quaterniond orient(imu_kptr->orientation.w, imu_kptr->orientation.x, imu_kptr->orientation.y, imu_kptr->orientation.z);
 
-    Isometry3d iso;
-    iso.pretranslate(trans).prerotate(orient);
+    Isometry3d iso(orient);
+    iso.pretranslate(trans);
 
     return iso;
 }
